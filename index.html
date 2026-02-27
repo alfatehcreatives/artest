@@ -3,119 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stellar MK-IV | AR Experience</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <title>Stellar MK-IV | AR Showcase</title>
     <style>
         :root { --accent: #00f2ff; --bg: #0a0a0a; }
-        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; overflow-x: hidden; }
+        body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg); color: white; overflow: hidden; }
         
         /* Catalog UI */
-        #catalog { padding: 40px; display: grid; place-items: center; min-height: 100vh; }
-        .product-card { 
-            background: #151515; border: 1px solid #333; border-radius: 20px; 
-            padding: 20px; text-align: center; transition: 0.3s; cursor: pointer; width: 280px;
+        #catalog { 
+            position: absolute; inset: 0; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; background: radial-gradient(circle, #1a1a1a 0%, #0a0a0a 100%);
+            z-index: 10; transition: opacity 0.5s;
         }
-        .product-card:hover { border-color: var(--accent); transform: translateY(-5px); }
-        .preview-thumb { width: 100%; height: 200px; background: #000; border-radius: 10px; margin-bottom: 15px; }
+        .product-card { 
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); 
+            border-radius: 24px; padding: 30px; text-align: center; width: 300px;
+            backdrop-filter: blur(10px); cursor: pointer; transition: 0.3s;
+        }
+        .product-card:hover { border-color: var(--accent); transform: translateY(-10px); }
+        .thumb-container { width: 100%; height: 200px; margin-bottom: 20px; pointer-events: none; }
         
         /* Modal */
-        #details-modal { 
-            position: fixed; inset: 0; background: rgba(0,0,0,0.9); 
-            display: none; justify-content: center; align-items: center; z-index: 100;
+        #modal { 
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85); 
+            display: none; justify-content: center; align-items: center; z-index: 20;
+            backdrop-filter: blur(8px);
         }
-        .modal-content { 
-            background: #1a1a1a; padding: 30px; border-radius: 20px; max-width: 500px; 
-            width: 90%; position: relative; border: 1px solid #444;
+        .modal-box { 
+            background: #111; padding: 40px; border-radius: 24px; max-width: 450px; 
+            width: 90%; border: 1px solid #333; position: relative;
         }
-        .close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; font-size: 24px; }
         
         /* Buttons */
         .btn { 
-            background: var(--accent); color: black; border: none; padding: 12px 25px; 
-            border-radius: 30px; font-weight: bold; cursor: pointer; transition: 0.2s; 
-            display: inline-block; text-decoration: none; margin-top: 15px;
+            background: var(--accent); color: black; border: none; padding: 15px 30px; 
+            border-radius: 50px; font-weight: 700; cursor: pointer; width: 100%;
+            font-size: 1rem; text-transform: uppercase; letter-spacing: 1px;
         }
-        .btn:hover { opacity: 0.8; box-shadow: 0 0 15px var(--accent); }
+        .close-btn { position: absolute; top: 20px; right: 20px; cursor: pointer; opacity: 0.5; }
 
         /* AR UI */
-        #ar-overlay { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; pointer-events: none; }
-        #ar-instructions { background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 50px; font-size: 14px; }
-        #exit-ar { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000; display: none; }
+        #ar-overlay { 
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%); 
+            background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 50px;
+            font-size: 14px; display: none; z-index: 100; pointer-events: none;
+        }
     </style>
 </head>
 <body>
 
-    <!-- Catalog View -->
     <div id="catalog">
-        <div class="product-card" onclick="openDetails()">
-            <div class="preview-thumb" id="thumb-canvas-container"></div>
-            <h3>Stellar MK-IV</h3>
-            <p style="color: #888;">Advanced Protective Gear</p>
-            <button class="btn">View Details</button>
+        <h1 style="margin-bottom: 40px; letter-spacing: 4px;">STELLAR SERIES</h1>
+        <div class="product-card" onclick="toggleModal(true)">
+            <div id="thumb-target" class="thumb-container"></div>
+            <h2>MK-IV HELMET</h2>
+            <p style="color: #888; margin-bottom: 20px;">Elite Exploration Gear</p>
+            <button class="btn">View Specs</button>
         </div>
     </div>
 
-    <!-- Product Details Modal -->
-    <div id="details-modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeDetails()">&times;</span>
-            <h2 id="m-title">Stellar MK-IV Helmet</h2>
-            <p id="m-desc">A relic of the future. The Stellar MK-IV features carbon-reinforced plating and a neural-link visor. Designed for extreme environments and space exploration.</p>
-            <ul style="color: #aaa; font-size: 0.9em; text-align: left;">
-                <li>Material: Titanium Alloy / Polycarbonate</li>
-                <li>Weight: 1.2kg</li>
-                <li>HUD: Integrated AR Display</li>
-            </ul>
-            <button class="btn" id="start-ar-btn">View in AR</button>
+    <div id="modal">
+        <div class="modal-box">
+            <span class="close-btn" onclick="toggleModal(false)">✕ CLOSE</span>
+            <h2 style="color: var(--accent)">Stellar MK-IV</h2>
+            <p>The pinnacle of protective technology. Features a reinforced titanium shell, integrated neural interface, and 360° environmental hazard sensors.</p>
+            <button class="btn" id="ar-trigger">Launch AR Experience</button>
         </div>
     </div>
 
-    <!-- AR Elements -->
-    <div id="ar-overlay">
-        <div id="ar-instructions">Point camera at a flat surface and tap to place</div>
-    </div>
-    <button class="btn" id="exit-ar" onclick="exitARMode()">Exit AR</button>
+    <div id="ar-overlay">Move camera to find a flat surface</div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
 
     <script type="module">
-        let scene, camera, renderer, model, controls;
-        let xrSession = null;
-        let hitTestSource = null;
-        let hitTestSourceRequested = false;
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         const modelUrl = 'https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf';
+        let scene, camera, renderer, model, reticle, hitTestSource = null, hitTestSourceRequested = false;
 
-        // Initialize Thumbnail
+        // 1. Thumbnail Preview Logic
         function initThumb() {
-            const container = document.getElementById('thumb-canvas-container');
-            const w = container.clientWidth, h = container.clientHeight;
+            const container = document.getElementById('thumb-target');
+            const tScene = new THREE.Scene();
+            const tCam = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 10);
+            tCam.position.z = 2.5;
             
-            const thumbScene = new THREE.Scene();
-            const thumbCam = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
-            thumbCam.position.set(0, 0, 3);
-            
-            const thumbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            thumbRenderer.setSize(w, h);
-            container.appendChild(thumbRenderer.domElement);
+            const tRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            tRenderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(tRenderer.domElement);
 
-            const light = new THREE.DirectionalLight(0xffffff, 1);
-            light.position.set(2, 2, 5);
-            thumbScene.add(light, new THREE.AmbientLight(0xffffff, 0.5));
+            tScene.add(new THREE.AmbientLight(0xffffff, 1), new THREE.DirectionalLight(0xffffff, 2));
 
-            new THREE.GLTFLoader().load(modelUrl, (gltf) => {
+            new GLTFLoader().load(modelUrl, (gltf) => {
                 const m = gltf.scene;
-                thumbScene.add(m);
-                function anim() {
+                tScene.add(m);
+                const anim = () => {
                     requestAnimationFrame(anim);
                     m.rotation.y += 0.01;
-                    thumbRenderer.render(thumbScene, thumbCam);
-                }
+                    tRenderer.render(tScene, tCam);
+                };
                 anim();
             });
         }
 
-        // Initialize Main AR/3D Scene
+        // 2. Main WebXR AR Logic
         async function initAR() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
@@ -125,117 +124,105 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
 
-            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-            scene.add(light);
+            scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
 
-            const loader = new THREE.GLTFLoader();
-            loader.load(modelUrl, (gltf) => {
+            // Placement Reticle (Ring)
+            reticle = new THREE.Mesh(
+                new THREE.RingGeometry(0.1, 0.11, 32).rotateX(-Math.PI / 2),
+                new THREE.MeshBasicMaterial({ color: 0x00f2ff })
+            );
+            reticle.matrixAutoUpdate = false;
+            reticle.visible = false;
+            scene.add(reticle);
+
+            // Load Model for AR
+            new GLTFLoader().load(modelUrl, (gltf) => {
                 model = gltf.scene;
-                model.scale.set(0.2, 0.2, 0.2);
+                model.scale.set(0.15, 0.15, 0.15);
                 model.visible = false;
                 scene.add(model);
             });
 
-            document.getElementById('start-ar-btn').addEventListener('click', startXRSession);
+            document.getElementById('ar-trigger').addEventListener('click', startXR);
         }
 
-        async function startXRSession() {
+        async function startXR() {
             if (navigator.xr) {
-                try {
+                const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (supported) {
                     const session = await navigator.xr.requestSession('immersive-ar', {
-                        requiredFeatures: ['hit-test']
+                        requiredFeatures: ['hit-test'],
+                        optionalFeatures: ['dom-overlay'],
+                        domOverlay: { root: document.body }
                     });
                     onSessionStarted(session);
-                } catch (e) {
-                    fallbackDesktopAR();
+                    return;
                 }
-            } else {
-                fallbackDesktopAR();
             }
+            alert("WebXR AR not supported on this browser/device. Falling back to 3D view.");
+            showDesktopFallback();
         }
 
         function onSessionStarted(session) {
-            xrSession = session;
-            document.body.appendChild(renderer.domElement);
             renderer.xr.setSession(session);
-            
-            document.getElementById('catalog').style.display = 'none';
-            document.getElementById('details-modal').style.display = 'none';
+            document.getElementById('catalog').style.opacity = '0';
+            document.getElementById('modal').style.display = 'none';
             document.getElementById('ar-overlay').style.display = 'block';
-            document.getElementById('exit-ar').style.display = 'block';
-
-            session.addEventListener('end', () => {
-                xrSession = null;
-                location.reload();
-            });
+            document.body.appendChild(renderer.domElement);
 
             session.addEventListener('select', () => {
-                if (model && model.visible) return;
-                // Handled in frame loop for hit test
+                if (reticle.visible && model) {
+                    model.position.setFromMatrixPosition(reticle.matrix);
+                    model.visible = true;
+                    document.getElementById('ar-overlay').innerText = "Model Placed";
+                }
             });
 
-            renderer.setAnimationLoop(renderXR);
-        }
+            renderer.setAnimationLoop((timestamp, frame) => {
+                if (frame) {
+                    const referenceSpace = renderer.xr.getReferenceSpace();
+                    const session = renderer.xr.getSession();
 
-        function renderXR(timestamp, frame) {
-            if (frame) {
-                const referenceSpace = renderer.xr.getReferenceSpace();
-                const session = frame.session;
-
-                if (!hitTestSourceRequested) {
-                    session.requestReferenceSpace('viewer').then((refSpace) => {
-                        session.requestHitTestSource({ space: refSpace }).then((source) => {
-                            hitTestSource = source;
+                    if (!hitTestSourceRequested) {
+                        session.requestReferenceSpace('viewer').then((refSpace) => {
+                            session.requestHitTestSource({ space: refSpace }).then((source) => {
+                                hitTestSource = source;
+                            });
                         });
-                    });
-                    hitTestSourceRequested = true;
-                }
+                        hitTestSourceRequested = true;
+                    }
 
-                if (hitTestSource) {
-                    const hitTestResults = frame.getHitTestResults(hitTestSource);
-                    if (hitTestResults.length > 0) {
-                        const hit = hitTestResults[0];
-                        const pose = hit.getPose(referenceSpace);
-
-                        if (!model.visible) {
-                            model.visible = true;
-                            model.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
-                            document.getElementById('ar-instructions').innerText = "Model Placed";
+                    if (hitTestSource) {
+                        const hitResults = frame.getHitTestResults(hitTestSource);
+                        if (hitResults.length > 0) {
+                            const hit = hitResults[0];
+                            reticle.visible = true;
+                            reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
+                        } else {
+                            reticle.visible = false;
                         }
                     }
                 }
-            }
-            renderer.render(scene, camera);
+                renderer.render(scene, camera);
+            });
         }
 
-        function fallbackDesktopAR() {
-            // Desktop fallback: Simple Orbit Controls 3D View
-            document.getElementById('details-modal').style.display = 'none';
+        function showDesktopFallback() {
+            document.getElementById('modal').style.display = 'none';
             document.getElementById('catalog').style.display = 'none';
-            document.getElementById('exit-ar').style.display = 'block';
-            
-            const fallbackRenderer = new THREE.WebGLRenderer({ antialias: true });
-            fallbackRenderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(fallbackRenderer.domElement);
-            
+            document.body.appendChild(renderer.domElement);
             camera.position.set(0, 0, 1);
-            controls = new THREE.OrbitControls(camera, fallbackRenderer.domElement);
+            const controls = new OrbitControls(camera, renderer.domElement);
             model.visible = true;
-            model.scale.set(0.5, 0.5, 0.5);
-
-            function animate() {
-                if (!xrSession) {
-                    requestAnimationFrame(animate);
-                    controls.update();
-                    fallbackRenderer.render(scene, camera);
-                }
-            }
-            animate();
+            renderer.setAnimationLoop(() => {
+                controls.update();
+                renderer.render(scene, camera);
+            });
         }
 
-        window.openDetails = () => document.getElementById('details-modal').style.display = 'flex';
-        window.closeDetails = () => document.getElementById('details-modal').style.display = 'none';
-        window.exitARMode = () => location.reload();
+        window.toggleModal = (show) => {
+            document.getElementById('modal').style.display = show ? 'flex' : 'none';
+        };
 
         window.onload = () => {
             initThumb();
