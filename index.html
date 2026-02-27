@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumière - Fine Dining AR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #f5f5f5; }
+        h1, h2, h3, .serif { font-family: 'Playfair Display', serif; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        #ar-canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+    </style>
+</head>
+<body class="overflow-x-hidden">
+
+    <nav class="fixed w-full z-50 px-8 py-6 flex justify-between items-center glass">
+        <div class="text-2xl font-bold tracking-widest uppercase serif">Lumière</div>
+        <button class="border border-amber-500/50 px-6 py-2 text-xs uppercase tracking-widest hover:bg-amber-500/10 transition">Book a Table</button>
+    </nav>
+
+    <section class="h-screen flex flex-col justify-center items-center text-center px-4 relative overflow-hidden">
+        <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=1920&q=80')] bg-cover bg-center opacity-30"></div>
+        <div class="relative z-10">
+            <h1 class="text-6xl md:text-8xl mb-6">Art of the <span class="italic text-amber-200">Palate</span></h1>
+            <p class="text-gray-400 max-w-xl mx-auto text-lg font-light leading-relaxed">View our signature dishes in your own space with Augmented Reality.</p>
+        </div>
+    </section>
+
+    <section class="py-24 px-8 max-w-7xl mx-auto">
+        <div id="menu-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12"></div>
+    </section>
+
+    <!-- AR Modal -->
+    <div id="modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/95 backdrop-blur-xl" onclick="closeModal()"></div>
+        <div class="relative w-full max-w-5xl glass rounded-3xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+            <button onclick="closeModal()" class="absolute top-6 right-6 z-[110] text-white/50 hover:text-white">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+
+            <div id="preview-container" class="w-full md:w-1/2 h-80 md:h-auto bg-black relative overflow-hidden">
+                <div id="ar-canvas-container"></div>
+                <img id="modal-img" src="" class="w-full h-full object-cover z-10 relative pointer-events-none transition-opacity" alt="Dish">
+            </div>
+
+            <div class="w-full md:w-1/2 p-8 md:p-12 overflow-y-auto">
+                <h3 id="modal-title" class="text-4xl mb-2 text-amber-200"></h3>
+                <p id="modal-price" class="text-2xl font-light mb-4 text-gray-400"></p>
+                <p id="modal-desc" class="text-gray-300 leading-relaxed mb-8 font-light"></p>
+                
+                <div class="space-y-4">
+                    <button id="ar-btn" onclick="startAR()" class="w-full py-4 border border-amber-500 text-amber-500 uppercase tracking-widest font-semibold hover:bg-amber-500 hover:text-black transition-all">
+                        Launch AR Experience
+                    </button>
+                    <p id="ar-support-msg" class="text-center text-xs text-gray-500"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const menu = [
+            { id: 1, title: "Truffle Tagliatelle", price: "$42", desc: "Hand-rolled pasta with black truffles.", img: "https://images.unsplash.com/photo-1524715273398-7803755de58e?auto=format&fit=crop&w=800&q=80", color: 0xffcc33 },
+            { id: 2, title: "Miso Glazed Cod", price: "$38", desc: "48-hour marinated Alaskan cod.", img: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80", color: 0xffffff },
+            { id: 3, title: "Wagyu Carpaccio", price: "$55", desc: "A5 Grade Miyazaki Wagyu.", img: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80", color: 0xaa0000 }
+        ];
+
+        let scene, camera, renderer, model, hitTestSource = null, hitPosition = null;
+        let isWebXRSupported = false;
+
+        function initThree() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.xr.enabled = true;
+            
+            const container = document.getElementById('ar-canvas-container');
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+            scene.add(light);
+
+            camera.position.z = 3;
+
+            // Check XR Support
+            if ('xr' in navigator) {
+                navigator.xr.isSessionSupported('immersive-ar').then(supported => {
+                    isWebXRSupported = supported;
+                    document.getElementById('ar-support-msg').innerText = supported ? 
+                        "Surface detection available on this device" : "3D Preview only (AR requires mobile Chrome/Safari)";
+                });
+            }
+        }
+
+        function createDishModel(color) {
+            if (model) scene.remove(model);
+            const geometry = new THREE.CylinderGeometry(1, 1.1, 0.2, 32);
+            const material = new THREE.MeshPhongMaterial({ color: color });
+            model = new THREE.Mesh(geometry, material);
+            scene.add(model);
+        }
+
+        async function startAR() {
+            if (!isWebXRSupported) {
+                // Desktop/Non-AR fallback: Just show 3D model
+                document.getElementById('modal-img').style.opacity = '0';
+                return;
+            }
+
+            const sessionInit = { requiredFeatures: ['hit-test'] };
+            const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+            renderer.xr.setReferenceSpaceType('local');
+            renderer.xr.setSession(session);
+
+            session.addEventListener('end', () => { hitTestSource = null; });
+
+            const refSpace = await session.requestReferenceSpace('viewer');
+            hitTestSource = await session.requestHitTestSource({ space: refSpace });
+        }
+
+        function openModal(id) {
+            const dish = menu.find(d => d.id === id);
+            document.getElementById('modal-title').innerText = dish.title;
+            document.getElementById('modal-price').innerText = dish.price;
+            document.getElementById('modal-desc').innerText = dish.desc;
+            document.getElementById('modal-img').src = dish.img;
+            document.getElementById('modal-img').style.opacity = '1';
+            
+            createDishModel(dish.color);
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+        function animate() {
+            renderer.setAnimationLoop((timestamp, frame) => {
+                if (frame && hitTestSource) {
+                    const referenceSpace = renderer.xr.getReferenceSpace();
+                    const hitTestResults = frame.getHitTestResults(hitTestSource);
+                    if (hitTestResults.length > 0) {
+                        const hit = hitTestResults[0];
+                        const pose = hit.getPose(referenceSpace);
+                        model.visible = true;
+                        model.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+                    }
+                } else if (!renderer.xr.isPresenting) {
+                    // Desktop rotation
+                    if (model) {
+                        model.rotation.y += 0.01;
+                        model.rotation.x = 0.5;
+                    }
+                }
+                renderer.render(scene, camera);
+            });
+        }
+
+        function renderMenu() {
+            const grid = document.getElementById('menu-grid');
+            grid.innerHTML = menu.map(dish => `
+                <div class="cursor-pointer group" onclick="openModal(${dish.id})">
+                    <div class="aspect-[4/5] overflow-hidden mb-4"><img src="${dish.img}" class="w-full h-full object-cover"></div>
+                    <h3 class="text-xl">${dish.title}</h3>
+                </div>
+            `).join('');
+        }
+
+        window.onload = () => {
+            renderMenu();
+            initThree();
+            animate();
+        };
+
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('ar-canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+    </script>
+</body>
+</html>
